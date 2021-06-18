@@ -18,56 +18,6 @@ class ViewController: UIViewController
     @IBOutlet weak var scrollView: UIScrollView!
     
     var selectedColors = [String:Bool]()
-
-    struct RGBA32: Equatable
-    {
-        private var color: UInt32
-
-        var redComponent: UInt8
-        {
-            return UInt8((color >> 24) & 255)
-        }
-
-        var greenComponent: UInt8
-        {
-            return UInt8((color >> 16) & 255)
-        }
-
-        var blueComponent: UInt8
-        {
-            return UInt8((color >> 8) & 255)
-        }
-
-        var alphaComponent: UInt8
-        {
-            return UInt8((color >> 0) & 255)
-        }
-
-        init(red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8)
-        {
-            let red   = UInt32(red)
-            let green = UInt32(green)
-            let blue  = UInt32(blue)
-            let alpha = UInt32(alpha)
-            color = (red << 24) | (green << 16) | (blue << 8) | (alpha << 0)
-        }
-
-        static let red     = RGBA32(red: 255, green: 0,   blue: 0,   alpha: 255)
-        static let green   = RGBA32(red: 0,   green: 255, blue: 0,   alpha: 255)
-        static let blue    = RGBA32(red: 0,   green: 0,   blue: 255, alpha: 255)
-        static let white   = RGBA32(red: 255, green: 255, blue: 255, alpha: 255)
-        static let black   = RGBA32(red: 0,   green: 0,   blue: 0,   alpha: 255)
-        static let magenta = RGBA32(red: 255, green: 0,   blue: 255, alpha: 255)
-        static let yellow  = RGBA32(red: 255, green: 255, blue: 0,   alpha: 255)
-        static let cyan    = RGBA32(red: 0,   green: 255, blue: 255, alpha: 255)
-        
-        static let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-
-        static func ==(lhs: RGBA32, rhs: RGBA32) -> Bool
-        {
-            return lhs.color == rhs.color
-        }
-    }
     
     //MARK:- Implementation
     
@@ -186,64 +136,6 @@ class ViewController: UIViewController
         return color
     }
     
-    func processPixels(in fakeImage: UIImage) -> UIImage?
-    {
-        guard let inputCGImage = fakeImage.cgImage else
-        {
-            print("unable to get cgImage")
-            return nil
-        }
-        
-        let colorSpace       = CGColorSpaceCreateDeviceRGB()
-        let fakeImageWidth   = inputCGImage.width
-        let fakeImageHeight  = inputCGImage.height
-        let bytesPerPixel    = 4
-        let bitsPerComponent = 8
-        let bytesPerRow      = bytesPerPixel * fakeImageWidth
-        let bitmapInfo       = RGBA32.bitmapInfo
-
-        guard let context = CGContext(data: nil,
-                                      width: fakeImageWidth,
-                                      height: fakeImageHeight,
-                                      bitsPerComponent: bitsPerComponent,
-                                      bytesPerRow: bytesPerRow,
-                                      space: colorSpace,
-                                      bitmapInfo: bitmapInfo)
-        else
-        {
-            print("unable to create context")
-            return nil
-        }
-        
-        context.draw(inputCGImage, in: CGRect(x: 0, y: 0, width: fakeImageWidth, height: fakeImageHeight))
-
-        guard let buffer = context.data else
-        {
-            print("unable to get context data")
-            return nil
-        }
-
-        let pixelBuffer = buffer.bindMemory(to: RGBA32.self, capacity: fakeImageWidth * fakeImageHeight)
-        
-        for row in 0 ..< Int(fakeImageHeight)
-        {
-            for column in 0 ..< Int(fakeImageWidth)
-            {
-                let offset = row * fakeImageWidth + column
-                print(pixelBuffer[offset])
-                if pixelBuffer[offset] == .white
-                {
-                    pixelBuffer[offset] = .red
-                }
-            }
-        }
-
-        let outputCGImage = context.makeImage()!
-        let outputImage = UIImage(cgImage: outputCGImage, scale: fakeImage.scale, orientation: fakeImage.imageOrientation)
-
-        return outputImage
-    }
-    
     /**
     * parameter color: source color, which is must be replaced
     * parameter withColor: target color
@@ -327,7 +219,7 @@ class ViewController: UIViewController
 
             // Compare two colors using given tolerance value
             
-            if compareColor(color: sourceColor, withColor: currentColorSource , withTolerance: tolerance)
+            if sourceColor.compareColor(withColor: currentColorSource , withTolerance: tolerance)
             {
                 // If the're 'similar', then replace pixel color with given target color
                 
@@ -358,20 +250,6 @@ class ViewController: UIViewController
 //        free(rawDataDest)
         
         return result
-    }
-
-    func compareColor(color: UIColor, withColor: UIColor, withTolerance: CGFloat) -> Bool
-    {
-        var r1: CGFloat = 0.0, g1: CGFloat = 0.0, b1: CGFloat = 0.0, a1: CGFloat = 0.0;
-        var r2: CGFloat = 0.0, g2: CGFloat = 0.0, b2: CGFloat = 0.0, a2: CGFloat = 0.0;
-
-        color.getRed(&r1, green: &g1, blue: &b1, alpha: &a1);
-        withColor.getRed(&r2, green: &g2, blue: &b2, alpha: &a2);
-
-        return abs(r1 - r2) <= withTolerance &&
-            abs(g1 - g2) <= withTolerance &&
-            abs(b1 - b2) <= withTolerance &&
-            abs(a1 - a2) <= withTolerance;
     }
     
 }
@@ -425,36 +303,19 @@ extension UIColor
         return (red: red, green: green, blue: blue, alpha: alpha)
     }
     
-    var redComponent: CGFloat
+    func compareColor(withColor: UIColor, withTolerance: CGFloat) -> Bool
     {
-        var red: CGFloat = 0.0
-        getRed(&red, green: nil, blue: nil, alpha: nil)
-        
-        return red
+        var r1: CGFloat = 0.0, g1: CGFloat = 0.0, b1: CGFloat = 0.0, a1: CGFloat = 0.0;
+        var r2: CGFloat = 0.0, g2: CGFloat = 0.0, b2: CGFloat = 0.0, a2: CGFloat = 0.0;
+
+        self.getRed(&r1, green: &g1, blue: &b1, alpha: &a1);
+        withColor.getRed(&r2, green: &g2, blue: &b2, alpha: &a2);
+
+        return abs(r1 - r2) <= withTolerance &&
+            abs(g1 - g2) <= withTolerance &&
+            abs(b1 - b2) <= withTolerance &&
+            abs(a1 - a2) <= withTolerance;
     }
     
-    var greenComponent: CGFloat
-    {
-        var green: CGFloat = 0.0
-        getRed(nil, green: &green, blue: nil, alpha: nil)
-        
-        return green
-    }
-    
-    var blueComponent: CGFloat
-    {
-        var blue: CGFloat = 0.0
-        getRed(nil, green: nil, blue: &blue, alpha: nil)
-        
-        return blue
-    }
-    
-    var alphaComponent: CGFloat
-    {
-        var alpha: CGFloat = 0.0
-        getRed(nil, green: nil, blue: nil, alpha: &alpha)
-        
-        return alpha
-    }
 }
 
